@@ -1,0 +1,21 @@
+# API Keys and secrets
+.env
+
+# Test output files
+news_summary.txt
+telegram_response.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Environment
+.venv
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
