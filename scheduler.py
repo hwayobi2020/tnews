@@ -101,6 +101,31 @@ def send_telegram_message(chat_id, message):
         return False
 
 
+def get_news_summary(keyword):
+    """키워드로 뉴스 요약 가져오기 (캐시 우선)"""
+    # 1. 캐시 확인
+    cached = db.get_cached_news(keyword)
+    if cached:
+        print(f"  [CACHE] 캐시된 요약 사용: {keyword}")
+        return cached['summary']
+
+    # 2. 캐시 없으면 새로 생성
+    news = get_google_news(keyword, max_results=10)
+    if not news:
+        print(f"  [SKIP] 뉴스 없음")
+        return None
+
+    summary = summarize_news_with_claude(news, keyword)
+    if not summary:
+        print(f"  [SKIP] 요약 실패")
+        return None
+
+    # 3. 캐시에 저장
+    db.save_news_cache(keyword, summary)
+
+    return summary
+
+
 def send_news_to_all_users():
     """모든 활성 사용자에게 뉴스 전송"""
     print("=" * 60)
@@ -117,19 +142,12 @@ def send_news_to_all_users():
 
         print(f"\n[USER] {email} - 키워드: {keyword}")
 
-        # 1. 뉴스 수집
-        news = get_google_news(keyword, max_results=10)
-        if not news:
-            print(f"  [SKIP] 뉴스 없음")
-            continue
-
-        # 2. Claude 요약
-        summary = summarize_news_with_claude(news, keyword)
+        # 1. 뉴스 요약 가져오기 (캐시 우선)
+        summary = get_news_summary(keyword)
         if not summary:
-            print(f"  [SKIP] 요약 실패")
             continue
 
-        # 3. 텔레그램 전송
+        # 2. 텔레그램 전송
         success = send_telegram_message(chat_id, summary)
         if success:
             print(f"  [OK] 전송 완료!")

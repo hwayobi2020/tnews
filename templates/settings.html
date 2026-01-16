@@ -72,4 +72,17 @@
         </p>
     </div>
 </div>
+
+<!-- 오늘의 뉴스 요약 -->
+{% if news_summary %}
+<div class="card" style="margin-top: 20px;">
+    <h2 style="margin-bottom: 15px;">오늘의 뉴스 브리핑</h2>
+    <div class="news-summary" style="background: #f9f9f9; padding: 20px; border-radius: 10px; white-space: pre-line; line-height: 1.8; font-size: 14px;">
+{{ news_summary }}
+    </div>
+    <p style="font-size: 12px; color: #999; margin-top: 12px;">
+        이 내용이 매일 아침 텔레그램으로 발송됩니다.
+    </p>
+</div>
+{% endif %}
 {% endblock %}

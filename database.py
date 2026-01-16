@@ -32,6 +32,16 @@ def init_db():
         )
     ''')
 
+    # 뉴스 캐시 테이블 (같은 키워드면 캐시된 요약 사용)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS news_cache (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            keyword TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     conn.commit()
     conn.close()
     print("[DB] 테이블 생성 완료!")
@@ -154,6 +164,40 @@ def get_user_count():
     conn.close()
 
     return result['count']
+
+
+def get_cached_news(keyword):
+    """오늘 날짜의 캐시된 뉴스 요약 조회"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    today = datetime.now().strftime('%Y-%m-%d')
+
+    cursor.execute('''
+        SELECT * FROM news_cache
+        WHERE keyword = ? AND DATE(created_at) = ?
+        ORDER BY created_at DESC LIMIT 1
+    ''', (keyword, today))
+
+    cache = cursor.fetchone()
+    conn.close()
+
+    return dict(cache) if cache else None
+
+
+def save_news_cache(keyword, summary):
+    """뉴스 요약 캐시 저장"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        INSERT INTO news_cache (keyword, summary, created_at)
+        VALUES (?, ?, ?)
+    ''', (keyword, summary, datetime.now().isoformat()))
+
+    conn.commit()
+    conn.close()
+    print(f"[DB] 뉴스 캐시 저장: {keyword}")
 
 
 # 테스트

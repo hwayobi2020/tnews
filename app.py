@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 import database as db
+from scheduler import get_news_summary
 
 app = Flask(__name__)
 app.secret_key = 'tnews-secret-key-change-this-in-production'
@@ -28,6 +29,7 @@ def settings():
         return redirect(url_for('index'))
 
     user = db.get_user_by_email(session['user_email'])
+    news_summary = None
 
     if request.method == 'POST':
         keyword = request.form.get('keyword')
@@ -35,13 +37,19 @@ def settings():
             db.update_keyword(user['email'], keyword)
             flash('키워드가 저장되었습니다!', 'success')
             user = db.get_user_by_email(session['user_email'])  # 갱신
+            # 키워드 변경 시 바로 뉴스 요약 보여주기
+            news_summary = get_news_summary(keyword)
+
+    # GET 요청이거나 POST 후에도 뉴스 요약 표시
+    if not news_summary and user['keyword']:
+        news_summary = get_news_summary(user['keyword'])
 
     # 텔레그램 딥링크 생성
     telegram_link = f"https://t.me/{BOT_USERNAME}?start={user['code']}"
 
     user_count = db.get_user_count()
 
-    return render_template('settings.html', user=user, telegram_link=telegram_link, user_count=user_count)
+    return render_template('settings.html', user=user, telegram_link=telegram_link, user_count=user_count, news_summary=news_summary)
 
 
 # DB 초기화
