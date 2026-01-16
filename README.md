@@ -1,55 +1,88 @@
-# AI News Briefing Bot (tnews)
+# AI News Briefing Service (tnews)
 
-텔레그램 봇을 통해 매일 자동으로 뉴스를 수집하고 Claude AI가 요약해서 전송하는 프로젝트입니다.
+웹에서 키워드를 검색하고, 텔레그램으로 매일 AI 요약 뉴스를 받는 서비스입니다.
 
-## 📚 문서
+## 핵심 컨셉
 
-- [사용 가이드](NEWS_BOT_README.md) - 설치 및 사용 방법
-- [개발 히스토리](DEVELOPMENT_HISTORY.md) - 프로젝트 개발 과정
+**"웹에서 검색 → 텔레그램으로 구독"**
 
-## 🚀 빠른 시작
+- 사용자가 웹에서 키워드 검색
+- 뉴스 미리보기 확인
+- "텔레그램으로 이동" 클릭 → 자동 구독
+- **텔레그램 첫 진입 시 뉴스 먼저 표시** → 구독 확인 메시지
+- 매일 아침 해당 키워드 뉴스 수신
 
-```bash
-# 1. 저장소 클론
-git clone https://github.com/hwayobi2020/tnews.git
-cd tnews
+사용자는 텔레그램에서 명령어를 입력하지 않습니다. 웹에서 모든 것을 컨트롤합니다.
 
-# 2. 라이브러리 설치
-pip install feedparser anthropic requests urllib3
+## 시스템 구조
 
-# 3. 환경 변수 설정
-export ANTHROPIC_API_KEY="your-key"
-export TELEGRAM_BOT_TOKEN="your-token"
-export TELEGRAM_CHAT_ID="your-chat-id"
-
-# 4. 실행
-python telegram_news_bot.py
+```
+[웹 브라우저] → [Flask 웹서버] → 뉴스 미리보기
+                    ↓
+            텔레그램 딥링크
+                    ↓
+[텔레그램 봇] → 자동 구독 + 뉴스 전송
+                    ↓
+              [SQLite DB]
 ```
 
-## ✨ 주요 기능
+- **웹**: 키워드 검색, 뉴스 미리보기 (DB 저장 안함)
+- **텔레그램**: 구독 저장, 뉴스 전송 (DB 저장)
+- **1인 1키워드**: 각 사용자는 하나의 키워드만 구독
 
-- 🔍 키워드 기반 뉴스 검색 (Google News RSS)
-- 🤖 Claude AI 요약
-- 📱 텔레그램 자동 전송
-- ⏰ 스케줄러 (예정)
-
-## 📂 프로젝트 구조
+## 파일 구조
 
 ```
 tnews/
-├── telegram_news_bot.py       # 메인 스크립트
-├── news_summarizer.py         # 뉴스 수집 + 요약
-├── get_chat_id.py            # Chat ID 확인
-├── README.md                 # 이 파일
-├── NEWS_BOT_README.md        # 상세 가이드
-├── DEVELOPMENT_HISTORY.md    # 개발 히스토리
-└── .env.example              # 환경 변수 예제
+├── app.py              # Flask 웹서버
+├── bot.py              # 텔레그램 봇
+├── scheduler.py        # 뉴스 수집 + Claude AI 요약
+├── database.py         # SQLite DB 관리
+├── templates/
+│   ├── index.html      # 키워드 검색 페이지
+│   └── result.html     # 뉴스 결과 + 텔레그램 링크
+├── news_data.db        # SQLite 데이터베이스
+└── .env                # API 키 (ANTHROPIC_API_KEY, TELEGRAM_BOT_TOKEN)
 ```
 
-## 📝 라이센스
+## 실행 방법
 
-MIT
+```bash
+# 1. 웹서버 실행
+python app.py
+
+# 2. 텔레그램 봇 실행 (별도 터미널)
+python bot.py
+```
+
+- 웹: http://127.0.0.1:5000
+- 텔레그램 봇: @hana_sec_ai_bot
+
+## 사용 흐름
+
+1. 웹에서 "비트코인" 검색
+2. AI 요약 뉴스 미리보기
+3. "텔레그램으로 이동" 클릭
+4. 텔레그램 열리며 자동 구독
+5. 매일 아침 "비트코인" 뉴스 수신
+
+## 환경 변수 (.env)
+
+```
+ANTHROPIC_API_KEY=your-claude-api-key
+TELEGRAM_BOT_TOKEN=your-telegram-bot-token
+```
+
+## 데이터베이스
+
+**subscribers 테이블**
+- `chat_id`: 텔레그램 채팅 ID
+- `keyword`: 구독 키워드
+- `created_at`: 구독 시간
+
+**news_cache 테이블**
+- 뉴스 캐시 (중복 API 호출 방지)
 
 ---
 
-**Made with ❤️ by hwayobi2020**
+**Made by hwayobi2020**

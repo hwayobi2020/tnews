@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ keyword }} - AI 뉴스 브리핑</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 700px;
+            margin: 0 auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .header h1 {
+            color: #333;
+            font-size: 24px;
+        }
+        .header a {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .keyword-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+        .subscriber-count {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        .news-content {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+            line-height: 1.8;
+            color: #333;
+            white-space: pre-wrap;
+        }
+        .telegram-section {
+            background: #e8f4fd;
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+        }
+        .telegram-section h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .telegram-section p {
+            color: #666;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        .telegram-btn {
+            display: inline-block;
+            background: #0088cc;
+            color: white;
+            padding: 15px 40px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-size: 16px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .telegram-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 136, 204, 0.4);
+        }
+        .share-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            text-align: center;
+        }
+        .share-link {
+            background: #f0f0f0;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #666;
+            display: inline-block;
+        }
+        .error-message {
+            background: #fee;
+            color: #c00;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>AI 뉴스 브리핑</h1>
+            <a href="/">다른 키워드 검색</a>
+        </div>
+
+        <div class="keyword-badge">{{ keyword }}</div>
+
+        {% if subscriber_count > 0 %}
+        <div class="subscriber-count">
+            {{ subscriber_count }}명이 이 키워드를 구독하고 있습니다
+        </div>
+        {% endif %}
+
+        {% if news_summary %}
+        <div class="news-content">{{ news_summary }}</div>
+        {% else %}
+        <div class="error-message">
+            뉴스를 가져오는 중 문제가 발생했습니다.<br>
+            잠시 후 다시 시도해주세요.
+        </div>
+        {% endif %}
+
+        <div class="telegram-section">
+            <h3>매일 아침 뉴스 받기</h3>
+            <p>텔레그램으로 "{{ keyword }}" 뉴스를 매일 받아보세요</p>
+            <a href="{{ telegram_link }}" class="telegram-btn" target="_blank">
+                Go to Telegram
+            </a>
+        </div>
+
+        <div class="share-section">
+            <p style="color: #888; font-size: 14px; margin-bottom: 10px;">이 뉴스 공유하기</p>
+            <div class="share-link">/news/{{ keyword }}</div>
+        </div>
+    </div>
+</body>
+</html>

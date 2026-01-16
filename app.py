@@ -1,86 +1,60 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash
+from urllib.parse import quote
+from dotenv import load_dotenv
+load_dotenv()
+
 import database as db
 from scheduler import get_news_summary
 
 app = Flask(__name__)
 app.secret_key = 'tnews-secret-key-change-this-in-production'
 
-BOT_USERNAME = "ainews_hana_bot"
+BOT_USERNAME = "hana_sec_ai_bot"
 
 
 @app.route('/')
 def index():
-    """메인 페이지 - 바로 설정으로"""
-    # 테스트용 사용자 자동 생성
-    test_email = "test@test.com"
-    user = db.get_user_by_email(test_email)
-
-    if not user:
-        user = db.create_user(test_email, "test")
-
-    session['user_email'] = test_email
-    return redirect(url_for('settings'))
+    """메인 페이지 - 키워드 입력"""
+    return render_template('index.html')
 
 
-@app.route('/settings', methods=['GET', 'POST'])
-def settings():
-    """키워드 설정 페이지"""
-    if 'user_email' not in session:
+@app.route('/search', methods=['POST'])
+def search():
+    """키워드로 뉴스 검색"""
+    keyword = request.form.get('keyword', '').strip()
+
+    if not keyword:
+        flash('키워드를 입력해주세요.', 'error')
         return redirect(url_for('index'))
 
-    user = db.get_user_by_email(session['user_email'])
-    news_summary = None
+    # 뉴스 요약 가져오기
+    news_summary = get_news_summary(keyword)
 
-    if request.method == 'POST':
-        keyword = request.form.get('keyword')
-        if keyword:
-            db.update_keyword(user['email'], keyword)
-            flash('키워드가 저장되었습니다!', 'success')
-            user = db.get_user_by_email(session['user_email'])  # 갱신
-            # 키워드 변경 시 바로 뉴스 요약 보여주기
-            news_summary = get_news_summary(keyword)
+    # 텔레그램 딥링크 (키워드로 바로 구독)
+    telegram_link = f"https://t.me/{BOT_USERNAME}?start={quote(keyword)}"
 
-    # GET 요청이거나 POST 후에도 뉴스 요약 표시
-    if not news_summary and user['keyword']:
-        news_summary = get_news_summary(user['keyword'])
+    # 같은 키워드 구독자 수
+    subscriber_count = db.get_users_by_keyword(keyword)
 
-    # 텔레그램 딥링크 생성
-    telegram_link = f"https://t.me/{BOT_USERNAME}?start={user['code']}"
-
-    # 공유 링크 생성
-    share_link_data = db.get_or_create_share_link(user['keyword'], user['email'])
-    share_link = f"{request.host_url}join/{share_link_data['share_code']}"
-
-    # 같은 키워드 사용자 수
-    keyword_users = db.get_users_by_keyword(user['keyword'])
-    user_count = db.get_user_count()
-
-    return render_template('settings.html', user=user, telegram_link=telegram_link,
-                          user_count=user_count, news_summary=news_summary,
-                          share_link=share_link, keyword_users=keyword_users)
+    return render_template('result.html',
+                          keyword=keyword,
+                          news_summary=news_summary,
+                          telegram_link=telegram_link,
+                          subscriber_count=subscriber_count)
 
 
-@app.route('/join/<share_code>')
-def join(share_code):
-    """공유 링크로 접속 - 같은 키워드로 자동 설정"""
-    share = db.get_share_link_by_code(share_code)
+@app.route('/news/<keyword>')
+def news(keyword):
+    """키워드 뉴스 페이지 (공유용)"""
+    news_summary = get_news_summary(keyword)
+    telegram_link = f"https://t.me/{BOT_USERNAME}?start={quote(keyword)}"
+    subscriber_count = db.get_users_by_keyword(keyword)
 
-    if not share:
-        flash('유효하지 않은 공유 링크입니다.', 'error')
-        return redirect(url_for('index'))
-
-    # 테스트용 사용자 생성 (새 사용자)
-    import secrets
-    test_email = f"user_{secrets.token_hex(4)}@test.com"
-    user = db.create_user(test_email, "test")
-
-    if user:
-        # 공유된 키워드로 설정
-        db.update_keyword(test_email, share['keyword'])
-        session['user_email'] = test_email
-        flash(f"'{share['keyword']}' 키워드 그룹에 참여했습니다!", 'success')
-
-    return redirect(url_for('settings'))
+    return render_template('result.html',
+                          keyword=keyword,
+                          news_summary=news_summary,
+                          telegram_link=telegram_link,
+                          subscriber_count=subscriber_count)
 
 
 # DB 초기화

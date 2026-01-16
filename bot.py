@@ -1,109 +1,113 @@
 import os
-import asyncio
+import subprocess
+import time
+import sys
+from dotenv import load_dotenv
+load_dotenv()
+
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 import database as db
+from scheduler import get_news_summary
 
-# 환경 변수
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8250016808:AAHhsQoEaq_ORUKSFhjJ4NWB049YmbMl-Qw")
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7949423850:AAEY4izjt652nGs53oQf6urJxw93V28I72U")
+
+
+def kill_other_bot_instances():
+    """현재 프로세스를 제외한 다른 bot.py 프로세스 종료"""
+    current_pid = os.getpid()
+    print(f"[BOT] 현재 PID: {current_pid}", flush=True)
+    print("[BOT] 기존 봇 인스턴스 확인 중...", flush=True)
+
+    try:
+        # Windows에서 python 프로세스 목록 가져오기
+        result = subprocess.run(
+            ['tasklist', '/FI', 'IMAGENAME eq python*', '/FO', 'CSV'],
+            capture_output=True, text=True, encoding='cp949'
+        )
+
+        lines = result.stdout.strip().split('\n')
+        killed = False
+
+        for line in lines[1:]:  # 헤더 제외
+            if 'python' in line.lower():
+                parts = line.replace('"', '').split(',')
+                if len(parts) >= 2:
+                    try:
+                        pid = int(parts[1])
+                        if pid != current_pid:
+                            subprocess.run(['taskkill', '/F', '/PID', str(pid)],
+                                         capture_output=True)
+                            print(f"[BOT] PID {pid} 종료됨", flush=True)
+                            killed = True
+                    except (ValueError, IndexError):
+                        pass
+
+        if killed:
+            print("[BOT] 기존 인스턴스 종료 완료, 3초 대기...", flush=True)
+            time.sleep(3)
+        else:
+            print("[BOT] 기존 인스턴스 없음", flush=True)
+
+    except Exception as e:
+        print(f"[BOT] 인스턴스 정리 중 오류: {e}", flush=True)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    /start 명령어 처리
-    딥링크: /start ABC123 형태로 들어오면 코드 연결
+    웹에서 /start 키워드 링크로 들어오면
+    해당 키워드 뉴스를 보여주고 자동 구독
     """
     chat_id = str(update.effective_chat.id)
     user_name = update.effective_user.first_name or "사용자"
 
-    # 딥링크 코드 확인
     if context.args:
-        code = context.args[0]
-        user = db.get_user_by_code(code)
+        # 웹에서 키워드 링크로 들어온 경우: /start 비트코인
+        keyword = ' '.join(context.args)
 
-        if user:
-            # chat_id 연결
-            db.update_chat_id(code, chat_id)
+        # 구독 등록
+        db.subscribe_keyword(chat_id, keyword)
 
-            await update.message.reply_text(
-                f"안녕하세요, {user_name}님!\n\n"
-                f"텔레그램 연결이 완료되었습니다.\n\n"
-                f"설정된 키워드: {user['keyword']}\n\n"
-                f"매일 아침 뉴스 브리핑을 받게 됩니다!"
-            )
+        # 뉴스 보여주기
+        news_summary = get_news_summary(keyword)
+        if news_summary:
+            await update.message.reply_text(f"[{keyword}] 오늘의 뉴스\n\n{news_summary}")
+            await update.message.reply_text(f"매일 아침 '{keyword}' 뉴스를 보내드릴게요!")
         else:
+            await update.message.reply_text("뉴스를 가져오는 중 문제가 발생했습니다.")
+    else:
+        # 그냥 /start만 누른 경우
+        subscriber = db.get_subscriber(chat_id)
+        if subscriber:
+            # 이미 구독 중이면 뉴스 보여주기
+            keyword = subscriber['keyword']
+            news_summary = get_news_summary(keyword)
+            if news_summary:
+                await update.message.reply_text(f"[{keyword}] 오늘의 뉴스\n\n{news_summary}")
+            else:
+                await update.message.reply_text("뉴스를 가져오는 중 문제가 발생했습니다.")
+        else:
+            # 신규 사용자
             await update.message.reply_text(
-                f"유효하지 않은 코드입니다.\n"
-                f"웹사이트에서 다시 링크를 받아주세요."
+                f"안녕하세요, {user_name}님!\n"
+                f"AI 뉴스 브리핑 봇입니다.\n"
+                f"웹사이트에서 키워드를 검색하고 구독해주세요!"
             )
-    else:
-        # 그냥 /start 만 친 경우
-        await update.message.reply_text(
-            f"안녕하세요, {user_name}님!\n\n"
-            f"AI 뉴스 브리핑 봇입니다.\n\n"
-            f"웹사이트에서 가입 후 텔레그램 연결 링크를 클릭해주세요.\n\n"
-            f"명령어:\n"
-            f"/status - 내 설정 확인\n"
-            f"/help - 도움말"
-        )
-
-
-async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """현재 설정 확인"""
-    chat_id = str(update.effective_chat.id)
-
-    # chat_id로 사용자 찾기
-    users = db.get_all_active_users()
-    user = next((u for u in users if u['chat_id'] == chat_id), None)
-
-    if user:
-        await update.message.reply_text(
-            f"현재 설정\n\n"
-            f"이메일: {user['email']}\n"
-            f"키워드: {user['keyword']}\n"
-            f"상태: 활성화됨\n\n"
-            f"매일 아침 뉴스 브리핑을 받게 됩니다!"
-        )
-    else:
-        await update.message.reply_text(
-            f"연결된 계정이 없습니다.\n\n"
-            f"웹사이트에서 가입 후 텔레그램 연결 링크를 클릭해주세요."
-        )
-
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """도움말"""
-    await update.message.reply_text(
-        "AI 뉴스 브리핑 봇 도움말\n\n"
-        "이 봇은 매일 아침 설정한 키워드로 뉴스를 검색하고,\n"
-        "AI가 요약해서 보내드립니다.\n\n"
-        "명령어:\n"
-        "/start - 시작\n"
-        "/status - 내 설정 확인\n"
-        "/help - 이 도움말\n\n"
-        "키워드 변경은 웹사이트에서 가능합니다."
-    )
 
 
 def main():
     """봇 실행"""
-    import sys
+    # 먼저 기존 인스턴스 종료
+    kill_other_bot_instances()
+
     print("[BOT] 텔레그램 봇 시작...", flush=True)
 
-    # DB 초기화
     db.init_db()
 
-    # 봇 애플리케이션 생성
     app = Application.builder().token(BOT_TOKEN).build()
-
-    # 핸들러 등록
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("status", status))
-    app.add_handler(CommandHandler("help", help_command))
 
-    # 봇 실행
     print("[BOT] 봇이 실행 중입니다. Ctrl+C로 종료하세요.", flush=True)
-    sys.stdout.flush()
     app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 

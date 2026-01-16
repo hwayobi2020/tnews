@@ -1,6 +1,5 @@
 import sqlite3
 import os
-import secrets
 from datetime import datetime
 
 DB_PATH = os.path.join(os.path.dirname(__file__), 'tnews.db')
@@ -18,21 +17,19 @@ def init_db():
     conn = get_connection()
     cursor = conn.cursor()
 
+    # 구독자 테이블 (키워드 기반)
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
+        CREATE TABLE IF NOT EXISTS subscribers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            code TEXT UNIQUE NOT NULL,
-            chat_id TEXT,
-            keyword TEXT DEFAULT '인공지능',
+            chat_id TEXT UNIQUE NOT NULL,
+            keyword TEXT NOT NULL,
             is_active INTEGER DEFAULT 1,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     ''')
 
-    # 뉴스 캐시 테이블 (같은 키워드면 캐시된 요약 사용)
+    # 뉴스 캐시 테이블
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS news_cache (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,135 +39,83 @@ def init_db():
         )
     ''')
 
-    # 공유 링크 테이블 (키워드별 공유 코드)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS share_links (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            keyword TEXT NOT NULL,
-            share_code TEXT UNIQUE NOT NULL,
-            created_by TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-
     conn.commit()
     conn.close()
     print("[DB] 테이블 생성 완료!")
 
 
-def generate_code():
-    """고유 코드 생성 (8자리)"""
-    return secrets.token_urlsafe(6)  # 약 8자리
-
-
-def create_user(email, password):
-    """새 사용자 생성"""
+def subscribe_keyword(chat_id, keyword):
+    """키워드 구독 (신규 or 업데이트)"""
     conn = get_connection()
     cursor = conn.cursor()
 
-    code = generate_code()
+    cursor.execute('SELECT * FROM subscribers WHERE chat_id = ?', (chat_id,))
+    existing = cursor.fetchone()
 
-    try:
+    if existing:
         cursor.execute('''
-            INSERT INTO users (email, password, code)
-            VALUES (?, ?, ?)
-        ''', (email, password, code))
-        conn.commit()
-        user_id = cursor.lastrowid
-        print(f"[DB] 사용자 생성: {email}")
-        return {'id': user_id, 'email': email, 'code': code}
-    except sqlite3.IntegrityError:
-        print(f"[DB] 이미 존재하는 이메일: {email}")
-        return None
-    finally:
-        conn.close()
-
-
-def get_user_by_email(email):
-    """이메일로 사용자 조회"""
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute('SELECT * FROM users WHERE email = ?', (email,))
-    user = cursor.fetchone()
-    conn.close()
-
-    return dict(user) if user else None
-
-
-def get_user_by_code(code):
-    """코드로 사용자 조회"""
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute('SELECT * FROM users WHERE code = ?', (code,))
-    user = cursor.fetchone()
-    conn.close()
-
-    return dict(user) if user else None
-
-
-def update_chat_id(code, chat_id):
-    """텔레그램 chat_id 연결"""
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute('''
-        UPDATE users
-        SET chat_id = ?, updated_at = ?
-        WHERE code = ?
-    ''', (chat_id, datetime.now().isoformat(), code))
+            UPDATE subscribers
+            SET keyword = ?, is_active = 1, updated_at = ?
+            WHERE chat_id = ?
+        ''', (keyword, datetime.now().isoformat(), chat_id))
+        print(f"[DB] 구독 업데이트: chat_id={chat_id}, keyword={keyword}")
+    else:
+        cursor.execute('''
+            INSERT INTO subscribers (chat_id, keyword, created_at, updated_at)
+            VALUES (?, ?, ?, ?)
+        ''', (chat_id, keyword, datetime.now().isoformat(), datetime.now().isoformat()))
+        print(f"[DB] 신규 구독: chat_id={chat_id}, keyword={keyword}")
 
     conn.commit()
-    updated = cursor.rowcount > 0
+    conn.close()
+    return True
+
+
+def get_subscriber(chat_id):
+    """구독자 조회"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT * FROM subscribers WHERE chat_id = ? AND is_active = 1', (chat_id,))
+    subscriber = cursor.fetchone()
     conn.close()
 
-    if updated:
-        print(f"[DB] chat_id 연결: code={code}, chat_id={chat_id}")
-    return updated
+    return dict(subscriber) if subscriber else None
 
 
-def update_keyword(email, keyword):
-    """키워드 업데이트"""
+def unsubscribe(chat_id):
+    """구독 해제"""
     conn = get_connection()
     cursor = conn.cursor()
 
     cursor.execute('''
-        UPDATE users
-        SET keyword = ?, updated_at = ?
-        WHERE email = ?
-    ''', (keyword, datetime.now().isoformat(), email))
+        UPDATE subscribers SET is_active = 0, updated_at = ?
+        WHERE chat_id = ?
+    ''', (datetime.now().isoformat(), chat_id))
 
     conn.commit()
-    updated = cursor.rowcount > 0
     conn.close()
-
-    if updated:
-        print(f"[DB] 키워드 업데이트: {email} -> {keyword}")
-    return updated
+    print(f"[DB] 구독 해제: chat_id={chat_id}")
 
 
-def get_all_active_users():
-    """활성 사용자 전체 조회 (chat_id 있는)"""
+def get_all_active_subscribers():
+    """모든 활성 구독자 조회"""
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute('''
-        SELECT * FROM users
-        WHERE is_active = 1 AND chat_id IS NOT NULL
-    ''')
-    users = cursor.fetchall()
+    cursor.execute('SELECT * FROM subscribers WHERE is_active = 1')
+    subscribers = cursor.fetchall()
     conn.close()
 
-    return [dict(user) for user in users]
+    return [dict(s) for s in subscribers]
 
 
-def get_user_count():
-    """전체 사용자 수"""
+def get_users_by_keyword(keyword):
+    """키워드별 구독자 수"""
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute('SELECT COUNT(*) as count FROM users')
+    cursor.execute('SELECT COUNT(*) as count FROM subscribers WHERE keyword = ? AND is_active = 1', (keyword,))
     result = cursor.fetchone()
     conn.close()
 
@@ -211,59 +156,6 @@ def save_news_cache(keyword, summary):
     print(f"[DB] 뉴스 캐시 저장: {keyword}")
 
 
-def get_or_create_share_link(keyword, created_by=None):
-    """키워드의 공유 링크 가져오기 (없으면 생성)"""
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    # 기존 공유 링크 확인
-    cursor.execute('SELECT * FROM share_links WHERE keyword = ?', (keyword,))
-    share = cursor.fetchone()
-
-    if share:
-        conn.close()
-        return dict(share)
-
-    # 없으면 새로 생성
-    share_code = secrets.token_urlsafe(6)
-    cursor.execute('''
-        INSERT INTO share_links (keyword, share_code, created_by, created_at)
-        VALUES (?, ?, ?, ?)
-    ''', (keyword, share_code, created_by, datetime.now().isoformat()))
-
-    conn.commit()
-    share_id = cursor.lastrowid
-    conn.close()
-
-    print(f"[DB] 공유 링크 생성: {keyword} -> {share_code}")
-    return {'id': share_id, 'keyword': keyword, 'share_code': share_code}
-
-
-def get_share_link_by_code(share_code):
-    """공유 코드로 키워드 조회"""
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute('SELECT * FROM share_links WHERE share_code = ?', (share_code,))
-    share = cursor.fetchone()
-    conn.close()
-
-    return dict(share) if share else None
-
-
-def get_users_by_keyword(keyword):
-    """같은 키워드를 사용하는 사용자 수 조회"""
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute('SELECT COUNT(*) as count FROM users WHERE keyword = ? AND is_active = 1', (keyword,))
-    result = cursor.fetchone()
-    conn.close()
-
-    return result['count']
-
-
-# 테스트
 if __name__ == "__main__":
     init_db()
     print(f"[DB] 경로: {DB_PATH}")

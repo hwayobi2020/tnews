@@ -1,33 +1,188 @@
-{% extends 'base.html' %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 뉴스 브리핑</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        .search-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        input[type="text"]:focus {
+            border-color: #667eea;
+        }
+        button {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .examples {
+            margin-top: 20px;
+            color: #888;
+            font-size: 14px;
+        }
+        .examples span {
+            display: inline-block;
+            background: #f0f0f0;
+            padding: 5px 12px;
+            border-radius: 15px;
+            margin: 5px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .examples span:hover {
+            background: #e0e0e0;
+        }
+        .flash-error {
+            background: #fee;
+            color: #c00;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .loading {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+        }
+        .loading.show {
+            display: block;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e0e0e0;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .loading-text {
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AI 뉴스 브리핑</h1>
+        <p class="subtitle">관심 키워드를 입력하면 AI가 뉴스를 요약해드립니다</p>
 
-{% block title %}AI 뉴스 브리핑 - 매일 아침 맞춤 뉴스{% endblock %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <div class="flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endwith %}
 
-{% block content %}
-<div class="user-count">
-    <strong>{{ user_count }}명</strong>
-    이 뉴스를 받고 있어요
-</div>
+        <form class="search-form" action="/search" method="POST" id="searchForm">
+            <input type="text" name="keyword" id="keywordInput" placeholder="예: 비트코인, 인공지능, 테슬라..." autofocus>
+            <button type="submit" id="submitBtn">검색</button>
+        </form>
 
-<div class="card">
-    <h1>AI 뉴스 브리핑</h1>
-    <p class="subtitle">매일 아침, 당신만의 뉴스를 텔레그램으로 받아보세요</p>
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <div class="loading-text">
+                <span id="keywordText"></span> 뉴스를 AI가 요약하고 있습니다...<br>
+                <small>잠시만 기다려주세요 (약 10-20초)</small>
+            </div>
+        </div>
 
-    <div style="margin-bottom: 24px; padding: 20px; background: #f8f9fa; border-radius: 10px;">
-        <p style="font-size: 14px; color: #666; line-height: 1.6;">
-            <strong>사용 방법</strong><br>
-            1. 회원가입<br>
-            2. 원하는 키워드 설정<br>
-            3. 텔레그램 연결<br>
-            4. 매일 아침 뉴스 수신!
-        </p>
+        <div class="examples" id="examples">
+            인기 키워드:
+            <span onclick="setKeyword('인공지능')">인공지능</span>
+            <span onclick="setKeyword('비트코인')">비트코인</span>
+            <span onclick="setKeyword('테슬라')">테슬라</span>
+            <span onclick="setKeyword('반도체')">반도체</span>
+        </div>
     </div>
 
-    <a href="{{ url_for('register') }}" class="btn btn-primary" style="display: block; text-align: center; text-decoration: none; margin-bottom: 12px;">
-        시작하기
-    </a>
+    <script>
+        const form = document.getElementById('searchForm');
+        const input = document.getElementById('keywordInput');
+        const btn = document.getElementById('submitBtn');
+        const loading = document.getElementById('loading');
+        const examples = document.getElementById('examples');
+        const keywordText = document.getElementById('keywordText');
 
-    <div class="link">
-        이미 계정이 있나요? <a href="{{ url_for('login') }}">로그인</a>
-    </div>
-</div>
-{% endblock %}
+        form.addEventListener('submit', function(e) {
+            const keyword = input.value.trim();
+            if (!keyword) {
+                e.preventDefault();
+                return;
+            }
+
+            // 로딩 표시
+            btn.disabled = true;
+            btn.textContent = '검색 중...';
+            loading.classList.add('show');
+            examples.style.display = 'none';
+            keywordText.textContent = '"' + keyword + '"';
+        });
+
+        function setKeyword(keyword) {
+            input.value = keyword;
+            form.dispatchEvent(new Event('submit'));
+            form.submit();
+        }
+    </script>
+</body>
+</html>

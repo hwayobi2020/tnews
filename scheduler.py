@@ -10,8 +10,8 @@ import database as db
 # SSL 우회 (필요시)
 ssl._create_default_https_context = ssl._create_unverified_context
 
-# 환경 변수
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+# 환경 변수 (환경변수가 빈 문자열이면 기본값 사용)
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY") or "sk-ant-api03-W6eT4wKVjr-VK0yLq17I4cZPTwb4LfKN0u5i0wkrTk0d0fAn1mS5n8-sVQdJZkKBKmnAKtX2v8H3vKcWLgCyqQ-jlN6SwAA"
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8250016808:AAHhsQoEaq_ORUKSFhjJ4NWB049YmbMl-Qw")
 
 
