@@ -71,7 +71,33 @@
             상태: {% if user.chat_id %}매일 아침 뉴스 발송 예정{% else %}텔레그램 연결 대기중{% endif %}
         </p>
     </div>
+
+    <!-- 공유 링크 -->
+    <div style="border-top: 1px solid #eee; margin-top: 20px; padding-top: 20px;">
+        <label>친구에게 공유하기</label>
+        <p style="font-size: 14px; color: #666; margin-bottom: 12px;">
+            같은 키워드로 뉴스를 받고 싶은 친구에게 이 링크를 보내세요!<br>
+            <strong>현재 {{ keyword_users }}명</strong>이 '{{ user.keyword }}' 뉴스를 받고 있어요.
+        </p>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="text" value="{{ share_link }}" readonly id="share-link"
+                   style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 12px;">
+            <button onclick="copyShareLink()" class="btn" style="padding: 10px 16px; background: #28a745; color: white;">
+                복사
+            </button>
+        </div>
+    </div>
 </div>
+
+<script>
+function copyShareLink() {
+    var copyText = document.getElementById("share-link");
+    copyText.select();
+    copyText.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(copyText.value);
+    alert("링크가 복사되었습니다!");
+}
+</script>
 
 <!-- 오늘의 뉴스 요약 -->
 {% if news_summary %}

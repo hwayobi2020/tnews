@@ -42,6 +42,17 @@ def init_db():
         )
     ''')
 
+    # 공유 링크 테이블 (키워드별 공유 코드)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS share_links (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            keyword TEXT NOT NULL,
+            share_code TEXT UNIQUE NOT NULL,
+            created_by TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     conn.commit()
     conn.close()
     print("[DB] 테이블 생성 완료!")
@@ -198,6 +209,58 @@ def save_news_cache(keyword, summary):
     conn.commit()
     conn.close()
     print(f"[DB] 뉴스 캐시 저장: {keyword}")
+
+
+def get_or_create_share_link(keyword, created_by=None):
+    """키워드의 공유 링크 가져오기 (없으면 생성)"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # 기존 공유 링크 확인
+    cursor.execute('SELECT * FROM share_links WHERE keyword = ?', (keyword,))
+    share = cursor.fetchone()
+
+    if share:
+        conn.close()
+        return dict(share)
+
+    # 없으면 새로 생성
+    share_code = secrets.token_urlsafe(6)
+    cursor.execute('''
+        INSERT INTO share_links (keyword, share_code, created_by, created_at)
+        VALUES (?, ?, ?, ?)
+    ''', (keyword, share_code, created_by, datetime.now().isoformat()))
+
+    conn.commit()
+    share_id = cursor.lastrowid
+    conn.close()
+
+    print(f"[DB] 공유 링크 생성: {keyword} -> {share_code}")
+    return {'id': share_id, 'keyword': keyword, 'share_code': share_code}
+
+
+def get_share_link_by_code(share_code):
+    """공유 코드로 키워드 조회"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT * FROM share_links WHERE share_code = ?', (share_code,))
+    share = cursor.fetchone()
+    conn.close()
+
+    return dict(share) if share else None
+
+
+def get_users_by_keyword(keyword):
+    """같은 키워드를 사용하는 사용자 수 조회"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT COUNT(*) as count FROM users WHERE keyword = ? AND is_active = 1', (keyword,))
+    result = cursor.fetchone()
+    conn.close()
+
+    return result['count']
 
 
 # 테스트
