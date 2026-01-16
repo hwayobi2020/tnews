@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block title %}AI 뉴스 브리핑 - 매일 아침 맞춤 뉴스{% endblock %}
+
+{% block content %}
+<div class="user-count">
+    <strong>{{ user_count }}명</strong>
+    이 뉴스를 받고 있어요
+</div>
+
+<div class="card">
+    <h1>AI 뉴스 브리핑</h1>
+    <p class="subtitle">매일 아침, 당신만의 뉴스를 텔레그램으로 받아보세요</p>
+
+    <div style="margin-bottom: 24px; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+        <p style="font-size: 14px; color: #666; line-height: 1.6;">
+            <strong>사용 방법</strong><br>
+            1. 회원가입<br>
+            2. 원하는 키워드 설정<br>
+            3. 텔레그램 연결<br>
+            4. 매일 아침 뉴스 수신!
+        </p>
+    </div>
+
+    <a href="{{ url_for('register') }}" class="btn btn-primary" style="display: block; text-align: center; text-decoration: none; margin-bottom: 12px;">
+        시작하기
+    </a>
+
+    <div class="link">
+        이미 계정이 있나요? <a href="{{ url_for('login') }}">로그인</a>
+    </div>
+</div>
+{% endblock %}

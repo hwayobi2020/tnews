@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block title %}회원가입 - AI 뉴스 브리핑{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>회원가입</h1>
+    <p class="subtitle">이메일과 비밀번호를 입력해주세요</p>
+
+    <form method="POST">
+        <div class="form-group">
+            <label>이메일</label>
+            <input type="email" name="email" placeholder="example@email.com" required>
+        </div>
+
+        <div class="form-group">
+            <label>비밀번호</label>
+            <input type="password" name="password" placeholder="비밀번호" required>
+        </div>
+
+        <div class="form-group">
+            <label>비밀번호 확인</label>
+            <input type="password" name="password_confirm" placeholder="비밀번호 확인" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary">가입하기</button>
+    </form>
+
+    <div class="link">
+        이미 계정이 있나요? <a href="{{ url_for('login') }}">로그인</a>
+    </div>
+</div>
+{% endblock %}
